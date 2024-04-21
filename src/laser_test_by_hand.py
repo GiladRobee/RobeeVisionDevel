@@ -1,9 +1,9 @@
 import cv2
 import os
 import numpy as np
-
+import tkinter as tk
 import cv2
-
+height, width = tk.Tk().winfo_screenwidth(), tk.Tk().winfo_screenheight()
 class DrawLineWidget(object):
     def __init__(self, image_path):
         self.original_image = cv2.imread(path, cv2.IMREAD_COLOR)
@@ -12,6 +12,7 @@ class DrawLineWidget(object):
         self.line_counter = 0
         self.slopes = []
         cv2.namedWindow('image')
+        cv2.resizeWindow('image', height, width)
         cv2.setMouseCallback('image', self.extract_coordinates)
 
         # List to store start/end points
@@ -32,6 +33,7 @@ class DrawLineWidget(object):
             self.line_counter+=1
             self.slopes.append((self.image_coordinates_e[1] - self.image_coordinates_s[1])/(self.image_coordinates_e[0] - self.image_coordinates_s[0]))
             # Draw line
+            cv2.resizeWindow('image', height, width)
             cv2.imshow("image", self.clone) 
 
         
@@ -42,13 +44,16 @@ class DrawLineWidget(object):
 if __name__ == '__main__':
     abs_path = os.path.abspath(os.path.dirname(__file__))
     print(abs_path)
-    rel_path = "../images/18.4/3_l_Color.png"
+    rel_path = "../images/21.4/0_l_11_4k_rotated.png"
     path = os.path.join(abs_path, rel_path)
     print(path)
     draw_line_widget = DrawLineWidget(path)
     looping =True
+    cv2.namedWindow('image')
+    cv2.resizeWindow('image', height, width)
+
     while looping:
-        cv2.imshow('image', draw_line_widget.show_image())
+        cv2.imshow('image', draw_line_widget.original_image)
         key = cv2.waitKey(1)
 
         # Close program with keyboard 'q'
@@ -71,3 +76,6 @@ if __name__ == '__main__':
     print(ang1, ang2)
     angle = ang1 - ang2
     print(angle)
+    if angle < 0:
+        angle += np.pi
+    print(angle*180/np.pi," degrees")

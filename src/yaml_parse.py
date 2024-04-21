@@ -10,6 +10,11 @@ if __name__ == '__main__':
     rel_path_im = "../images/18.4/3_l_Color.png"
     path_im = os.path.join(abs_path, rel_path_im)
     print(path_im)
+
+    temp_dir = rel_path_im.split("/images/")[-1].split("/")[0]
+    print(temp_dir)
+
+
     rel_path_yaml = "../config/"+rel_path_im.split("/images/")[-1].removesuffix(".png")+".yaml"
     path_yml = os.path.join(abs_path, rel_path_yaml)
     # reading the image 

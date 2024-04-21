@@ -6,7 +6,10 @@ import sys
 import os
 import yaml
 from pprint import pprint
-
+import tkinter as tk
+root = tk.Tk()
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
 
 
 class lasersIO():
@@ -15,10 +18,11 @@ class lasersIO():
         pass
     def loadImage(self,path):
         self.path = path
-        self.input_image = cv2.imread(path)
+        self.input_image = cv2.imread(path,cv2.IMREAD_COLOR)
         # self.input_image = cv2.cvtColor(r_image,cv2.COLOR_BGR2RGB)
     def showImage(self, image):
         cv2.namedWindow("output", cv2.WINDOW_NORMAL)  
+        cv2.resizeWindow("output", screen_width, screen_height)
         cv2.imshow("output", image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -95,7 +99,8 @@ class lasersIO():
         self.color_masks = []
         for i in range(len(self.masks)):
             temp_mask = self.masks[i]
-            color_mask_i = temp_mask[:,:,0] > 200
+            # color_mask_i = temp_mask[:,:,0] > 200 #test this!!!
+            color_mask_i = temp_mask[:,:,2] > 200
             color_mask_i = color_mask_i.astype(np.uint8)
             color_mask_i[color_mask_i > 0] = 255
             self.color_masks.append(color_mask_i)
@@ -109,6 +114,7 @@ class lasersIO():
 
     def showColorMask(self,i):
         cv2.namedWindow("output", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("output", screen_width, screen_height)
         temp_img = self.color_masks[i]
         temp_img = cv2.cvtColor(temp_img,cv2.COLOR_GRAY2BGR)
         cv2.imshow("output", self.color_masks[i])
@@ -159,10 +165,10 @@ class lasersIO():
             extTop = tuple(c[c[:, :, 1].argmin()][0])
             extBot = tuple(c[c[:, :, 1].argmax()][0])
             show_img = self.input_image.copy()
-            cv2.circle(show_img,extLeft,3,(0,255,255),-1)
-            cv2.circle(show_img,extRight,3,(255,0,255),-1)
-            cv2.circle(show_img,extTop,3,(255,255,0),-1)
-            cv2.circle(show_img,extBot,3,(0,0,255),-1)
+            # cv2.circle(show_img,extLeft,3,(0,255,255),-1)
+            # cv2.circle(show_img,extRight,3,(255,0,255),-1)
+            # cv2.circle(show_img,extTop,3,(255,255,0),-1)
+            # cv2.circle(show_img,extBot,3,(0,0,255),-1)
             # self.showImage(show_img)
             comp_features.append({"extLeft":extLeft,"extRight":extRight,"extTop":extTop,"extBot":extBot})
 
@@ -172,9 +178,9 @@ class lasersIO():
             raise Exception("Not enough components")
         comp_features = comp_features[:2]
         interest_points = {"leftGapPoint":comp_features[0]["extLeft"],"RightGapPoint":comp_features[1]["extRight"]}
-        cv2.circle(show_img,interest_points["leftGapPoint"],3,(0,255,255),-1)
-        cv2.circle(show_img,interest_points["RightGapPoint"],3,(255,0,255),-1)
-        # self.showImage(show_img)
+        cv2.circle(show_img,interest_points["leftGapPoint"],5,(0,255,255),-1)
+        cv2.circle(show_img,interest_points["RightGapPoint"],5,(255,0,255),-1)
+        self.showImage(show_img)
         self.int_points.append(interest_points)
         return interest_points
     
@@ -225,8 +231,8 @@ class lasersIO():
         print("s_point_r: ",s_point_r," e_point_r: ",e_point_r)
         print("s_point_l: ",s_point_l," e_point_l: ",e_point_l)
         temp_img = self.input_image.copy()
-        cv2.line(temp_img,s_point_r,e_point_r,(100,125,200),2)
-        cv2.line(temp_img,s_point_l,e_point_l,(200,70,10),2)
+        cv2.line(temp_img,s_point_r,e_point_r,(100,125,200),7)
+        cv2.line(temp_img,s_point_l,e_point_l,(200,70,10),7)
         self.slope_r = slope_r
         self.Yint_r = Yint_r
         self.slope_l = slope_l
@@ -252,7 +258,7 @@ def main():
     lasers = lasersIO()
     abs_path_im = os.path.abspath(os.path.dirname(__file__))
     print(abs_path_im)
-    rel_path_im = "../images/18.4/3_l_hd_Color.png"
+    rel_path_im = "../images/21.4/0_l_11_4k_rotated.png"
     path_im = os.path.join(abs_path_im, rel_path_im)
     print(path_im)
     lasers.loadImage(path=path_im)
@@ -300,36 +306,53 @@ def main():
     lasers.maskImage()
     lasers.genColorMask()
 
-    # lasers.showColorMask(0)
+    lasers.showColorMask(0)
     comps0 = lasers.findComponents(lasers.color_masks[0])
     filt0 = lasers.filterComponents(comps0,0)
     sort0 = lasers.sortComponents(filt0)
     int_point0_ = lasers.sortComponentsByFeatures(sort0)
-    # lasers.showComponents(sort0)
+    lasers.showComponents(sort0)
 
-    # lasers.showColorMask(1)
+    lasers.showColorMask(1)
     comps1 = lasers.findComponents(lasers.color_masks[1])
     filt1 = lasers.filterComponents(comps1,1)
     sort1 = lasers.sortComponents(filt1)
     int_point1_ = lasers.sortComponentsByFeatures(sort1)
-    # lasers.showComponents(sort1)
+    lasers.showComponents(sort1)
 
-    # lasers.showColorMask(2)
+    lasers.showColorMask(2)
     comps2 = lasers.findComponents(lasers.color_masks[2])
     filt2 = lasers.filterComponents(comps2,2)
     sort2 = lasers.sortComponents(filt2)
     int_point2_ = lasers.sortComponentsByFeatures(sort2)
-    # lasers.showComponents(sort2)
+    lasers.showComponents(sort2)
 
-    # lasers.showColorMask(3)
+    lasers.showColorMask(3)
     comps3 = lasers.findComponents(lasers.color_masks[3])
     filt3 = lasers.filterComponents(comps3,3)
     sort3 = lasers.sortComponents(filt3)
     int_point3_ = lasers.sortComponentsByFeatures(sort3)
-    # lasers.showComponents(sort3)
+    lasers.showComponents(sort3)
     
+    slp_r = (int_point0_["RightGapPoint"][1] - int_point3_["RightGapPoint"][1])/(int_point0_["RightGapPoint"][0] - int_point3_["RightGapPoint"][0])
+    slp_l = (int_point0_["leftGapPoint"][1] - int_point3_["leftGapPoint"][1])/(int_point0_["leftGapPoint"][0] - int_point3_["leftGapPoint"][0])
+    print("slope_r: ",slp_r)
+    print("slope_l: ",slp_l)
+    ang_r = math.atan(slp_r)
+    ang_l = math.atan(slp_l)
+    while ang_r < 0:
+        ang_r += math.pi
+    while ang_l < 0:
+        ang_l += math.pi
+    print("angle_r: ",ang_r)
+    print("angle_l: ",ang_l)
+    diff = abs(ang_r - ang_l)
+    print("angle difference with 2 points: ",diff*180/math.pi)
+
+
+
     lasers.linearFit()
-    gt_angle = 3
+    gt_angle = data["Goal"]
     try:
         measurements = lasers.angleDiff()
         assert(lasers.approx(measurements,gt_angle*math.pi/180))
