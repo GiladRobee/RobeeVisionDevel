@@ -3,6 +3,9 @@ import cv2
 import matplotlib.pyplot as plt 
 import math
 import sys
+import os
+import yaml
+from pprint import pprint
 
 
 
@@ -11,6 +14,7 @@ class lasersIO():
         self.int_points = []
         pass
     def loadImage(self,path):
+        self.path = path
         self.input_image = cv2.imread(path)
         # self.input_image = cv2.cvtColor(r_image,cv2.COLOR_BGR2RGB)
     def showImage(self, image):
@@ -223,38 +227,75 @@ class lasersIO():
         temp_img = self.input_image.copy()
         cv2.line(temp_img,s_point_r,e_point_r,(100,125,200),2)
         cv2.line(temp_img,s_point_l,e_point_l,(200,70,10),2)
+        self.slope_r = slope_r
+        self.Yint_r = Yint_r
+        self.slope_l = slope_l
+        self.Yint_l = Yint_l
         self.showImage(temp_img)
+        cv2.imwrite("output.png",temp_img)
+    
+    def angleDiff(self):
+        self.angle1 = math.atan(self.slope_r)
+        self.angle2 = math.atan(self.slope_l)
+        while self.angle1 < 0:
+            self.angle1 += math.pi
+        while self.angle2 < 0:
+            self.angle2 += math.pi
+        print("angle1: ",self.angle1," angle2: ",self.angle2)
+        return abs(self.angle1 - self.angle2)
+    
+    def approx(self,a,b):
+        return abs(a-b) < np.deg2rad(0.1)
+
         
 def main():
     lasers = lasersIO()
-    lasers.loadImage('/home/gilad/dev_ws/RobeeVisionDevel/images/14.4.24/1_Color.png')
-    # lasers.showImage(lasers.input_image)
-    lasers.setDividers(np.array(
-            [
-                [
-                    [0,0],
-                    [0,335],
-                    [400,0],
-                    [0,0],
-                    [0,0],
-                ],
-                [   
-                    [0,335],
-                    [0,475],
-                    [120,475],
-                    [715,0],
-                    [400,0],
-                ],
-                [
-                    [120,475],
-                    [535,475],
-                    [847,220],
-                    [715,0],
-                    [715,0],
-                ],
-            ],dtype=np.int32
-    ))
-    # print(lasers.getDividers())
+    abs_path_im = os.path.abspath(os.path.dirname(__file__))
+    print(abs_path_im)
+    rel_path_im = "../images/18.4/3_l_hd_Color.png"
+    path_im = os.path.join(abs_path_im, rel_path_im)
+    print(path_im)
+    lasers.loadImage(path=path_im)
+    
+
+    rel_path_yaml = "../config/"+rel_path_im.split("/images/")[-1].removesuffix(".png")+".yaml"
+    path_yml = os.path.join(abs_path_im, rel_path_yaml)
+
+    masks_points = []
+    with open(path_yml) as stream:
+        try:
+            data = yaml.safe_load(stream)
+            # print(data)
+        except yaml.YAMLError as exc:
+            print(exc)
+    num_of_masks = data["NumOfMasks"]
+
+    for i in range(num_of_masks):
+        mask = data["Mask"+str(i+1)]
+        # print("mask: ",i+1," = ", mask)
+        masks_points.append(mask["Points"])
+        # for j in mask["Points"]:
+        #     print(j)
+    
+    match data["Dtype"]:
+        case "np.int32":
+            dtype = np.int32
+        case "np.float32":
+            dtype = np.float32
+        case "np.float64":
+            dtype = np.float64
+        case "np.int64":
+            dtype = np.int64
+        case "np.int16":
+            dtype = np.int16
+        case _ :
+            dtype = np.int32
+    masks_points = np.array(masks_points, dtype=dtype)
+
+    lasers.setDividers(masks_points)
+
+
+    pprint(lasers.getDividers())
     print(lasers.getDividerShape())
     lasers.maskImage()
     lasers.genColorMask()
@@ -279,7 +320,26 @@ def main():
     sort2 = lasers.sortComponents(filt2)
     int_point2_ = lasers.sortComponentsByFeatures(sort2)
     # lasers.showComponents(sort2)
+
+    # lasers.showColorMask(3)
+    comps3 = lasers.findComponents(lasers.color_masks[3])
+    filt3 = lasers.filterComponents(comps3,3)
+    sort3 = lasers.sortComponents(filt3)
+    int_point3_ = lasers.sortComponentsByFeatures(sort3)
+    # lasers.showComponents(sort3)
+    
     lasers.linearFit()
+    gt_angle = 3
+    try:
+        measurements = lasers.angleDiff()
+        assert(lasers.approx(measurements,gt_angle*math.pi/180))
+    except AssertionError:
+        print("Angle difference is not ",gt_angle," degrees, it is ",measurements*180/math.pi," degrees")
+        sys.exit(1)
+
+    print("Angle difference is ",measurements*180/math.pi," degrees")
+        
+    
     
 if __name__ == "__main__":
     main()
