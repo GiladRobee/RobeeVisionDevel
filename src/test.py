@@ -55,7 +55,7 @@ if __name__=="__main__":
     screen_height = root.winfo_screenheight()
     abs_path = os.path.abspath(os.path.dirname(__file__))
     print(abs_path)
-    rel_path = "../images/21.4/0_l_11_4k_rotated.png" #"../images/18.4/3_l_Color.png"
+    rel_path = "../images/25.4/0_l_hd_Color.png" #"../images/18.4/3_l_Color.png"
     path = os.path.join(abs_path, rel_path)
     print(path)
     # reading the image 

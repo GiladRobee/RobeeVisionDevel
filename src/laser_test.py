@@ -184,6 +184,72 @@ class lasersIO():
         self.int_points.append(interest_points)
         return interest_points
     
+    def altSortComponentsByFeatures(self,components):
+        comp_features = []
+        for component in components:
+            count = len(component)
+            mask = self.genComponentMask(component)
+            xx,yy,xy,x,y = 0,0,0,0,0
+            for point in component:
+                i,j = point
+                xx += i**2
+                yy += j**2
+                xy += i*j
+                x += i
+                y += j
+            if count * xx - x**2 == 0:
+                continue
+            slope = (count * xy - x * y) / (count * xx - x**2)
+            Yint = (y - slope * x) / count
+            s_point_draw = component[len(component)//4][::-1]
+            e_point_draw = component[-1][::-1]
+            e_point_draw = (int(s_point_draw[0] - 100 * math.sin(math.atan(slope)) ),int(s_point_draw[1] - 100 * math.cos(math.atan(slope))))
+            x_vec = np.array([ math.sin(math.atan(slope)),math.cos(math.atan(slope))])
+            x_vec = x_vec / np.linalg.norm(x_vec)
+
+            temp_img = self.input_image.copy()
+            cv2.line(temp_img,s_point_draw,e_point_draw,(100,125,200),3)
+            self.showImage(temp_img)
+
+
+            max_point = []
+            max_val = np.NINF
+            min_point = []
+            min_val = np.Inf
+            for point in component:
+                i,j = point
+                y_vec = np.array([j - e_point_draw[0],i - e_point_draw[1]])
+                res =  np.dot(x_vec,y_vec) 
+                # print("res: ",res)
+                if res > max_val:
+                    max_val = res
+                    max_point = point
+                if res < min_val:
+                    min_val = res
+                    min_point = point
+            # if min_point == []:
+            #     min_point = e_point_draw
+            # if max_point == []:
+            #     max_point = e_point_draw
+            print("max_point: ",max_point)
+            print("min_point: ",min_point)
+            comp_features.append({"extLeft":min_point[::-1],"extRight":max_point[::-1],"extTop":[0,0],"extBot":[0,0]})
+
+        comp_features = sorted(comp_features,key=lambda x: x["extRight"],reverse=True)
+        if(len(comp_features) < 2):
+            print("Not enough components")
+            raise Exception("Not enough components")
+        show_img = self.input_image.copy()
+        comp_features = comp_features[:2]
+        print("comp_features: ",comp_features)
+        interest_points = {"leftGapPoint":comp_features[1]["extLeft"],"RightGapPoint":comp_features[0]["extRight"]}
+        cv2.circle(show_img,interest_points["leftGapPoint"],2,(0,255,255),-1)
+        cv2.circle(show_img,interest_points["RightGapPoint"],2,(255,0,255),-1)
+        self.showImage(show_img)
+        self.int_points.append(interest_points)
+        return interest_points
+
+    
     def euclideanDistance(self,p1,p2):
         return math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
     
@@ -231,14 +297,44 @@ class lasersIO():
         print("s_point_r: ",s_point_r," e_point_r: ",e_point_r)
         print("s_point_l: ",s_point_l," e_point_l: ",e_point_l)
         temp_img = self.input_image.copy()
-        cv2.line(temp_img,s_point_r,e_point_r,(100,125,200),7)
-        cv2.line(temp_img,s_point_l,e_point_l,(200,70,10),7)
+        cv2.line(temp_img,s_point_r,e_point_r,(100,125,200),3)
+        cv2.line(temp_img,s_point_l,e_point_l,(200,70,10),3)
         self.slope_r = slope_r
         self.Yint_r = Yint_r
         self.slope_l = slope_l
         self.Yint_l = Yint_l
+        self.spoint_r = s_point_r
+        self.epoint_r = e_point_r
+        self.spoint_l = s_point_l
+        self.epoint_l = e_point_l
+
+
+        l_int_point_dist = []
+        r_int_point_dist = []
+        for i in range(len(self.int_points)):
+            l_dist = (self.dist2line(s_point_l,e_point_l,self.int_points[i]["leftGapPoint"]))
+            r_dist = (self.dist2line(s_point_r,e_point_r,self.int_points[i]["RightGapPoint"]))
+            cv2.line(
+                temp_img,self.int_points[i]["leftGapPoint"],
+                     (int(self.int_points[i]["leftGapPoint"][0] - l_dist * math.cos(math.atan(slope_l))),int(self.int_points[i]["leftGapPoint"][1] - l_dist * math.sin(math.atan(slope_l)))),
+                     (0,255,0),2
+                )
+            cv2.line(
+                temp_img,self.int_points[i]["RightGapPoint"],
+                     (int(self.int_points[i]["RightGapPoint"][0] - r_dist * math.cos(math.atan(slope_r))),int(self.int_points[i]["RightGapPoint"][1] - r_dist * math.sin(math.atan(slope_r)))),
+                     (0,0,255),2
+                )
+            l_int_point_dist.append(l_dist)
+            r_int_point_dist.append(r_dist)
+        print("Left Gap Points distance to line: ",l_int_point_dist)
+        print("Right Gap Points distance to line: ",r_int_point_dist)
+        print("Var of left gap points: ",np.var(l_int_point_dist))
+        print("Var of right gap points: ",np.var(r_int_point_dist))
+
+
         self.showImage(temp_img)
         cv2.imwrite("output.png",temp_img)
+        
     
     def angleDiff(self):
         self.angle1 = math.atan(self.slope_r)
@@ -252,13 +348,22 @@ class lasersIO():
     
     def approx(self,a,b):
         return abs(a-b) < np.deg2rad(0.1)
+    
+    def dist2line(self,line_s,line_e,point):
+        x1,y1 = line_s
+        x2,y2 = line_e
+        x0,y0 = point
+        return ((y2-y1)*x0 - (x2-x1)*y0 + x2*y1 - y2*x1) / math.sqrt((y2-y1)**2 + (x2-x1)**2)
 
-        
+
+
+
+
 def main():
     lasers = lasersIO()
     abs_path_im = os.path.abspath(os.path.dirname(__file__))
     print(abs_path_im)
-    rel_path_im = "../images/21.4/0_l_11_4k_rotated.png"
+    rel_path_im = "../images/18.4/3_l_hd_Color.png" #"../images/25.4/0_l_hd_Color.png"
     path_im = os.path.join(abs_path_im, rel_path_im)
     print(path_im)
     lasers.loadImage(path=path_im)
@@ -306,32 +411,42 @@ def main():
     lasers.maskImage()
     lasers.genColorMask()
 
-    lasers.showColorMask(0)
+    # lasers.showColorMask(0)
     comps0 = lasers.findComponents(lasers.color_masks[0])
     filt0 = lasers.filterComponents(comps0,0)
     sort0 = lasers.sortComponents(filt0)
-    int_point0_ = lasers.sortComponentsByFeatures(sort0)
+    int_point0_ = lasers.altSortComponentsByFeatures(sort0)
+    # int_point0_ = lasers.sortComponentsByFeatures(sort0)
     lasers.showComponents(sort0)
 
-    lasers.showColorMask(1)
+
+# def main2():
+
+    # lasers.showColorMask(1)
     comps1 = lasers.findComponents(lasers.color_masks[1])
     filt1 = lasers.filterComponents(comps1,1)
     sort1 = lasers.sortComponents(filt1)
-    int_point1_ = lasers.sortComponentsByFeatures(sort1)
-    lasers.showComponents(sort1)
+    # int_point1_ = lasers.sortComponentsByFeatures(sort1)
+    int_point1_ = lasers.altSortComponentsByFeatures(sort1)
+    # lasers.showComponents(sort1)
 
-    lasers.showColorMask(2)
+    # lasers.showColorMask(2)
     comps2 = lasers.findComponents(lasers.color_masks[2])
     filt2 = lasers.filterComponents(comps2,2)
     sort2 = lasers.sortComponents(filt2)
-    int_point2_ = lasers.sortComponentsByFeatures(sort2)
-    lasers.showComponents(sort2)
+    # int_point2_ = lasers.sortComponentsByFeatures(sort2)
+    int_point2_ = lasers.altSortComponentsByFeatures(sort2)
+    # lasers.showComponents(sort2)
 
-    lasers.showColorMask(3)
+    # lasers.showColorMask(3)
     comps3 = lasers.findComponents(lasers.color_masks[3])
+    # pprint(comps3)
     filt3 = lasers.filterComponents(comps3,3)
+    # print("filt3= ",filt3)
     sort3 = lasers.sortComponents(filt3)
-    int_point3_ = lasers.sortComponentsByFeatures(sort3)
+    # int_point3_ = lasers.sortComponentsByFeatures(sort3)
+    # pprint(sort3)
+    int_point3_ = lasers.altSortComponentsByFeatures(sort3)
     lasers.showComponents(sort3)
     
     slp_r = (int_point0_["RightGapPoint"][1] - int_point3_["RightGapPoint"][1])/(int_point0_["RightGapPoint"][0] - int_point3_["RightGapPoint"][0])
@@ -358,9 +473,12 @@ def main():
         assert(lasers.approx(measurements,gt_angle*math.pi/180))
     except AssertionError:
         print("Angle difference is not ",gt_angle," degrees, it is ",measurements*180/math.pi," degrees")
-        sys.exit(1)
 
     print("Angle difference is ",measurements*180/math.pi," degrees")
+
+
+    
+     
         
     
     

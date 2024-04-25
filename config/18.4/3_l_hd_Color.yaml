@@ -1,5 +1,6 @@
 NumOfMasks: 4
 Dtype: np.int32
+Goal: 3.0
 Mask1:
   Points:
   - [0,0]
